@@ -34,7 +34,7 @@ func main() {
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetWindowTitle("GolangTextEditor")
 
-	if err := ebiten.RunGame(app.NewGame(ed)); err != nil {
+	if err := ebiten.RunGame(app.New(ed)); err != nil {
 		log.Fatal(err)
 	}
 }

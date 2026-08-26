@@ -2,7 +2,7 @@
 // and input backend. This is the only package in the module that may
 // import a graphics library; internal/buffer and internal/editor stay
 // backend-free so a different backend (raylib-go, go-sdl2, go-gl, ...)
-// can be dropped in later behind the same Game shape without touching
+// can be dropped in later behind the same App shape without touching
 // the editor core (see CLAUDE.md).
 package app
 
@@ -32,9 +32,12 @@ const (
 
 var face = text.NewGoXFace(basicfont.Face7x13)
 
-// Game implements ebiten.Game, driving an *editor.Editor from keyboard
-// input and rendering its buffer as plain monospaced text.
-type Game struct {
+// App implements the ebiten.Game interface (Update/Draw/Layout are the
+// method names that interface requires), driving an *editor.Editor from
+// keyboard input and rendering its buffer as plain monospaced text. The
+// type is named App, not Game, because this is a text editor front-end,
+// not a game.
+type App struct {
 	Ed *editor.Editor
 
 	blinkTick  int
@@ -42,71 +45,71 @@ type Game struct {
 	lastErr    string
 }
 
-// NewGame creates a Game around ed.
-func NewGame(ed *editor.Editor) *Game {
-	return &Game{Ed: ed, keyHeldFor: make(map[ebiten.Key]int)}
+// New creates an App around ed.
+func New(ed *editor.Editor) *App {
+	return &App{Ed: ed, keyHeldFor: make(map[ebiten.Key]int)}
 }
 
 // Update advances the editor state by one tick in response to input.
-func (g *Game) Update() error {
-	g.blinkTick++
+func (a *App) Update() error {
+	a.blinkTick++
 
 	for _, r := range ebiten.AppendInputChars(nil) {
-		g.Ed.InsertRune(r)
+		a.Ed.InsertRune(r)
 	}
 
-	g.handleRepeatable(ebiten.KeyEnter, g.Ed.InsertNewline)
-	g.handleRepeatable(ebiten.KeyBackspace, g.Ed.Backspace)
-	g.handleRepeatable(ebiten.KeyDelete, g.Ed.Delete)
-	g.handleRepeatable(ebiten.KeyArrowLeft, g.Ed.MoveLeft)
-	g.handleRepeatable(ebiten.KeyArrowRight, g.Ed.MoveRight)
-	g.handleRepeatable(ebiten.KeyArrowUp, g.Ed.MoveUp)
-	g.handleRepeatable(ebiten.KeyArrowDown, g.Ed.MoveDown)
-	g.handleRepeatable(ebiten.KeyHome, g.Ed.Home)
-	g.handleRepeatable(ebiten.KeyEnd, g.Ed.End)
+	a.handleRepeatable(ebiten.KeyEnter, a.Ed.InsertNewline)
+	a.handleRepeatable(ebiten.KeyBackspace, a.Ed.Backspace)
+	a.handleRepeatable(ebiten.KeyDelete, a.Ed.Delete)
+	a.handleRepeatable(ebiten.KeyArrowLeft, a.Ed.MoveLeft)
+	a.handleRepeatable(ebiten.KeyArrowRight, a.Ed.MoveRight)
+	a.handleRepeatable(ebiten.KeyArrowUp, a.Ed.MoveUp)
+	a.handleRepeatable(ebiten.KeyArrowDown, a.Ed.MoveDown)
+	a.handleRepeatable(ebiten.KeyHome, a.Ed.Home)
+	a.handleRepeatable(ebiten.KeyEnd, a.Ed.End)
 
 	ctrl := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
 	if ctrl && inpututil.IsKeyJustPressed(ebiten.KeyS) {
-		g.save()
+		a.save()
 	}
 
 	return nil
 }
 
-func (g *Game) save() {
-	if g.Ed.Path == "" {
-		g.lastErr = "no file path to save to (open editor with a file argument)"
+func (a *App) save() {
+	if a.Ed.Path == "" {
+		a.lastErr = "no file path to save to (open editor with a file argument)"
 		return
 	}
-	if err := g.Ed.Save(); err != nil {
-		g.lastErr = fmt.Sprintf("save failed: %v", err)
+	if err := a.Ed.Save(); err != nil {
+		a.lastErr = fmt.Sprintf("save failed: %v", err)
 		return
 	}
-	g.lastErr = ""
+	a.lastErr = ""
 }
 
 // handleRepeatable calls action on the tick a key is first pressed, and
 // again on a fixed interval while it is held, so navigation and deletion
 // feel natural without needing per-key state machines at call sites.
-func (g *Game) handleRepeatable(key ebiten.Key, action func()) {
+func (a *App) handleRepeatable(key ebiten.Key, action func()) {
 	if !ebiten.IsKeyPressed(key) {
-		delete(g.keyHeldFor, key)
+		delete(a.keyHeldFor, key)
 		return
 	}
-	held := g.keyHeldFor[key]
+	held := a.keyHeldFor[key]
 	if held == 0 {
 		action()
 	} else if held >= repeatDelayTicks && (held-repeatDelayTicks)%repeatIntervalTicks == 0 {
 		action()
 	}
-	g.keyHeldFor[key] = held + 1
+	a.keyHeldFor[key] = held + 1
 }
 
 // Draw renders the buffer contents, a blinking caret and a status bar.
-func (g *Game) Draw(screen *ebiten.Image) {
+func (a *App) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{R: 0x1e, G: 0x1e, B: 0x1e, A: 0xff})
 
-	buf := g.Ed.Buf
+	buf := a.Ed.Buf
 	for i := 0; i < buf.LineCount(); i++ {
 		y := marginY + i*lineHeight
 		op := &text.DrawOptions{}
@@ -115,31 +118,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		text.Draw(screen, buf.Line(i), face, op)
 	}
 
-	if g.blinkTick%60 < 30 {
-		cx := float32(marginX + g.Ed.Cursor.Col*charWidth)
-		cy := float32(marginY + g.Ed.Cursor.Line*lineHeight)
+	if a.blinkTick%60 < 30 {
+		cx := float32(marginX + a.Ed.Cursor.Col*charWidth)
+		cy := float32(marginY + a.Ed.Cursor.Line*lineHeight)
 		vector.StrokeLine(screen, cx, cy, cx, cy+lineHeight-2, 1, color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}, false)
 	}
 
-	g.drawStatusBar(screen)
+	a.drawStatusBar(screen)
 }
 
-func (g *Game) drawStatusBar(screen *ebiten.Image) {
+func (a *App) drawStatusBar(screen *ebiten.Image) {
 	w, h := screen.Bounds().Dx(), screen.Bounds().Dy()
 	barY := h - statusBarPx
 	vector.DrawFilledRect(screen, 0, float32(barY), float32(w), float32(statusBarPx), color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}, false)
 
-	name := g.Ed.Path
+	name := a.Ed.Path
 	if name == "" {
 		name = "[No Name]"
 	}
 	modified := ""
-	if g.Ed.Modified {
+	if a.Ed.Modified {
 		modified = " [+]"
 	}
-	status := fmt.Sprintf("%s%s  Ln %d, Col %d", name, modified, g.Ed.Cursor.Line+1, g.Ed.Cursor.Col+1)
-	if g.lastErr != "" {
-		status = g.lastErr
+	status := fmt.Sprintf("%s%s  Ln %d, Col %d", name, modified, a.Ed.Cursor.Line+1, a.Ed.Cursor.Col+1)
+	if a.lastErr != "" {
+		status = a.lastErr
 	}
 
 	op := &text.DrawOptions{}
@@ -149,6 +152,6 @@ func (g *Game) drawStatusBar(screen *ebiten.Image) {
 }
 
 // Layout keeps the window's logical resolution equal to its actual size.
-func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
+func (a *App) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return outsideWidth, outsideHeight
 }
