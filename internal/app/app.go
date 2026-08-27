@@ -130,7 +130,7 @@ func (a *App) Draw(screen *ebiten.Image) {
 func (a *App) drawStatusBar(screen *ebiten.Image) {
 	w, h := screen.Bounds().Dx(), screen.Bounds().Dy()
 	barY := h - statusBarPx
-	vector.DrawFilledRect(screen, 0, float32(barY), float32(w), float32(statusBarPx), color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}, false)
+	vector.FillRect(screen, 0, float32(barY), float32(w), float32(statusBarPx), color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}, false)
 
 	name := a.Ed.Path
 	if name == "" {
