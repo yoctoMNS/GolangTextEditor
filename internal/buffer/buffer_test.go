@@ -2,149 +2,280 @@ package buffer
 
 import "testing"
 
-func TestNewAndString(t *testing.T) {
-	b := New("hello\nworld")
-	if got, want := b.LineCount(), 2; got != want {
-		t.Fatalf("LineCount() = %d, want %d", got, want)
+func TestNew(t *testing.T) {
+	tests := []struct {
+		name          string
+		content       string
+		wantLineCount int
+		wantString    string
+	}{
+		{
+			name:          "single line",
+			content:       "hello",
+			wantLineCount: 1,
+			wantString:    "hello",
+		},
+		{
+			name:          "multiple lines",
+			content:       "hello\nworld",
+			wantLineCount: 2,
+			wantString:    "hello\nworld",
+		},
+		{
+			name:          "CRLF line endings are normalized to LF",
+			content:       "hello\r\nworld\r\n",
+			wantLineCount: 3,
+			wantString:    "hello\nworld\n",
+		},
 	}
-	if got, want := b.String(), "hello\nworld"; got != want {
-		t.Fatalf("String() = %q, want %q", got, want)
-	}
-}
 
-func TestNewStripsCR(t *testing.T) {
-	b := New("hello\r\nworld\r\n")
-	if got, want := b.Line(0), "hello"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
-	}
-	if got, want := b.LineCount(), 3; got != want {
-		t.Fatalf("LineCount() = %d, want %d", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(tt.content)
+			if got := b.LineCount(); got != tt.wantLineCount {
+				t.Errorf("LineCount() = %d, want %d", got, tt.wantLineCount)
+			}
+			if got := b.String(); got != tt.wantString {
+				t.Errorf("String() = %q, want %q", got, tt.wantString)
+			}
+		})
 	}
 }
 
 func TestInsertRune(t *testing.T) {
-	b := New("helloworld")
-	pos := b.InsertRune(Position{Line: 0, Col: 5}, ' ')
-	if got, want := b.Line(0), "hello world"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
+	tests := []struct {
+		name    string
+		initial string
+		pos     Position
+		r       rune
+		wantStr string
+		wantPos Position
+	}{
+		{
+			name:    "middle of line",
+			initial: "helloworld",
+			pos:     Position{Line: 0, Col: 5},
+			r:       ' ',
+			wantStr: "hello world",
+			wantPos: Position{Line: 0, Col: 6},
+		},
+		{
+			name:    "start of line",
+			initial: "world",
+			pos:     Position{Line: 0, Col: 0},
+			r:       'h',
+			wantStr: "hworld",
+			wantPos: Position{Line: 0, Col: 1},
+		},
+		{
+			name:    "end of line",
+			initial: "hello",
+			pos:     Position{Line: 0, Col: 5},
+			r:       '!',
+			wantStr: "hello!",
+			wantPos: Position{Line: 0, Col: 6},
+		},
+		{
+			name:    "multi-byte rune keeps rune-based column indexing",
+			initial: "こんにちは",
+			pos:     Position{Line: 0, Col: 2},
+			r:       '!',
+			wantStr: "こん!にちは",
+			wantPos: Position{Line: 0, Col: 3},
+		},
 	}
-	if want := (Position{Line: 0, Col: 6}); pos != want {
-		t.Fatalf("returned pos = %+v, want %+v", pos, want)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(tt.initial)
+			gotPos := b.InsertRune(tt.pos, tt.r)
+			if got := b.String(); got != tt.wantStr {
+				t.Errorf("String() = %q, want %q", got, tt.wantStr)
+			}
+			if gotPos != tt.wantPos {
+				t.Errorf("returned pos = %+v, want %+v", gotPos, tt.wantPos)
+			}
+		})
 	}
 }
 
 func TestInsertNewline(t *testing.T) {
-	b := New("helloworld")
-	pos := b.InsertNewline(Position{Line: 0, Col: 5})
-	if got, want := b.LineCount(), 2; got != want {
-		t.Fatalf("LineCount() = %d, want %d", got, want)
+	tests := []struct {
+		name    string
+		initial string
+		pos     Position
+		wantStr string
+		wantPos Position
+	}{
+		{
+			name:    "splits a line in the middle",
+			initial: "helloworld",
+			pos:     Position{Line: 0, Col: 5},
+			wantStr: "hello\nworld",
+			wantPos: Position{Line: 1, Col: 0},
+		},
+		{
+			name:    "at start of line leaves an empty line before",
+			initial: "hello",
+			pos:     Position{Line: 0, Col: 0},
+			wantStr: "\nhello",
+			wantPos: Position{Line: 1, Col: 0},
+		},
+		{
+			name:    "at end of line leaves an empty line after",
+			initial: "hello",
+			pos:     Position{Line: 0, Col: 5},
+			wantStr: "hello\n",
+			wantPos: Position{Line: 1, Col: 0},
+		},
 	}
-	if got, want := b.Line(0), "hello"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
-	}
-	if got, want := b.Line(1), "world"; got != want {
-		t.Fatalf("Line(1) = %q, want %q", got, want)
-	}
-	if want := (Position{Line: 1, Col: 0}); pos != want {
-		t.Fatalf("returned pos = %+v, want %+v", pos, want)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(tt.initial)
+			gotPos := b.InsertNewline(tt.pos)
+			if got := b.String(); got != tt.wantStr {
+				t.Errorf("String() = %q, want %q", got, tt.wantStr)
+			}
+			if gotPos != tt.wantPos {
+				t.Errorf("returned pos = %+v, want %+v", gotPos, tt.wantPos)
+			}
+		})
 	}
 }
 
-func TestDeleteBackwardWithinLine(t *testing.T) {
-	b := New("hello")
-	pos, ok := b.DeleteBackward(Position{Line: 0, Col: 5})
-	if !ok {
-		t.Fatal("expected deletion to succeed")
+func TestDeleteBackward(t *testing.T) {
+	tests := []struct {
+		name    string
+		initial string
+		pos     Position
+		wantOK  bool
+		wantStr string
+		wantPos Position
+	}{
+		{
+			name:    "within a line",
+			initial: "hello",
+			pos:     Position{Line: 0, Col: 5},
+			wantOK:  true,
+			wantStr: "hell",
+			wantPos: Position{Line: 0, Col: 4},
+		},
+		{
+			name:    "at start of line joins with previous line",
+			initial: "hello\nworld",
+			pos:     Position{Line: 1, Col: 0},
+			wantOK:  true,
+			wantStr: "helloworld",
+			wantPos: Position{Line: 0, Col: 5},
+		},
+		{
+			name:    "at start of buffer is a no-op",
+			initial: "hello",
+			pos:     Position{Line: 0, Col: 0},
+			wantOK:  false,
+			wantStr: "hello",
+			wantPos: Position{Line: 0, Col: 0},
+		},
 	}
-	if got, want := b.Line(0), "hell"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
-	}
-	if want := (Position{Line: 0, Col: 4}); pos != want {
-		t.Fatalf("returned pos = %+v, want %+v", pos, want)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(tt.initial)
+			gotPos, gotOK := b.DeleteBackward(tt.pos)
+			if gotOK != tt.wantOK {
+				t.Errorf("ok = %v, want %v", gotOK, tt.wantOK)
+			}
+			if got := b.String(); got != tt.wantStr {
+				t.Errorf("String() = %q, want %q", got, tt.wantStr)
+			}
+			if gotPos != tt.wantPos {
+				t.Errorf("returned pos = %+v, want %+v", gotPos, tt.wantPos)
+			}
+		})
 	}
 }
 
-func TestDeleteBackwardJoinsLines(t *testing.T) {
-	b := New("hello\nworld")
-	pos, ok := b.DeleteBackward(Position{Line: 1, Col: 0})
-	if !ok {
-		t.Fatal("expected deletion to succeed")
+func TestDeleteForward(t *testing.T) {
+	tests := []struct {
+		name    string
+		initial string
+		pos     Position
+		wantOK  bool
+		wantStr string
+	}{
+		{
+			name:    "within a line",
+			initial: "hello",
+			pos:     Position{Line: 0, Col: 0},
+			wantOK:  true,
+			wantStr: "ello",
+		},
+		{
+			name:    "at end of line joins with next line",
+			initial: "hello\nworld",
+			pos:     Position{Line: 0, Col: 5},
+			wantOK:  true,
+			wantStr: "helloworld",
+		},
+		{
+			name:    "at end of buffer is a no-op",
+			initial: "hello",
+			pos:     Position{Line: 0, Col: 5},
+			wantOK:  false,
+			wantStr: "hello",
+		},
 	}
-	if got, want := b.LineCount(), 1; got != want {
-		t.Fatalf("LineCount() = %d, want %d", got, want)
-	}
-	if got, want := b.Line(0), "helloworld"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
-	}
-	if want := (Position{Line: 0, Col: 5}); pos != want {
-		t.Fatalf("returned pos = %+v, want %+v", pos, want)
-	}
-}
 
-func TestDeleteBackwardAtStartOfBuffer(t *testing.T) {
-	b := New("hello")
-	pos, ok := b.DeleteBackward(Position{Line: 0, Col: 0})
-	if ok {
-		t.Fatal("expected deletion to fail at start of buffer")
-	}
-	if want := (Position{Line: 0, Col: 0}); pos != want {
-		t.Fatalf("returned pos = %+v, want %+v", pos, want)
-	}
-}
-
-func TestDeleteForwardWithinLine(t *testing.T) {
-	b := New("hello")
-	if ok := b.DeleteForward(Position{Line: 0, Col: 0}); !ok {
-		t.Fatal("expected deletion to succeed")
-	}
-	if got, want := b.Line(0), "ello"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
-	}
-}
-
-func TestDeleteForwardJoinsLines(t *testing.T) {
-	b := New("hello\nworld")
-	if ok := b.DeleteForward(Position{Line: 0, Col: 5}); !ok {
-		t.Fatal("expected deletion to succeed")
-	}
-	if got, want := b.LineCount(), 1; got != want {
-		t.Fatalf("LineCount() = %d, want %d", got, want)
-	}
-	if got, want := b.Line(0), "helloworld"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
-	}
-}
-
-func TestDeleteForwardAtEndOfBuffer(t *testing.T) {
-	b := New("hello")
-	if ok := b.DeleteForward(Position{Line: 0, Col: 5}); ok {
-		t.Fatal("expected deletion to fail at end of buffer")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(tt.initial)
+			gotOK := b.DeleteForward(tt.pos)
+			if gotOK != tt.wantOK {
+				t.Errorf("ok = %v, want %v", gotOK, tt.wantOK)
+			}
+			if got := b.String(); got != tt.wantStr {
+				t.Errorf("String() = %q, want %q", got, tt.wantStr)
+			}
+		})
 	}
 }
 
 func TestClamp(t *testing.T) {
 	b := New("hi\nworld")
-	if got, want := b.Clamp(Position{Line: -1, Col: -1}), (Position{Line: 0, Col: 0}); got != want {
-		t.Fatalf("Clamp = %+v, want %+v", got, want)
-	}
-	if got, want := b.Clamp(Position{Line: 0, Col: 99}), (Position{Line: 0, Col: 2}); got != want {
-		t.Fatalf("Clamp = %+v, want %+v", got, want)
-	}
-	if got, want := b.Clamp(Position{Line: 99, Col: 0}), (Position{Line: 1, Col: 0}); got != want {
-		t.Fatalf("Clamp = %+v, want %+v", got, want)
-	}
-}
 
-func TestUnicodeRunes(t *testing.T) {
-	b := New("こんにちは")
-	if got, want := b.LineLen(0), 5; got != want {
-		t.Fatalf("LineLen(0) = %d, want %d", got, want)
+	tests := []struct {
+		name string
+		pos  Position
+		want Position
+	}{
+		{
+			name: "negative line and column clamp to buffer start",
+			pos:  Position{Line: -1, Col: -1},
+			want: Position{Line: 0, Col: 0},
+		},
+		{
+			name: "column past end of line clamps to line length",
+			pos:  Position{Line: 0, Col: 99},
+			want: Position{Line: 0, Col: 2},
+		},
+		{
+			name: "line past end of buffer clamps to last line",
+			pos:  Position{Line: 99, Col: 0},
+			want: Position{Line: 1, Col: 0},
+		},
+		{
+			name: "already valid position is unchanged",
+			pos:  Position{Line: 1, Col: 3},
+			want: Position{Line: 1, Col: 3},
+		},
 	}
-	pos := b.InsertRune(Position{Line: 0, Col: 2}, '!')
-	if got, want := b.Line(0), "こん!にちは"; got != want {
-		t.Fatalf("Line(0) = %q, want %q", got, want)
-	}
-	if want := (Position{Line: 0, Col: 3}); pos != want {
-		t.Fatalf("returned pos = %+v, want %+v", pos, want)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := b.Clamp(tt.pos); got != tt.want {
+				t.Errorf("Clamp(%+v) = %+v, want %+v", tt.pos, got, tt.want)
+			}
+		})
 	}
 }
