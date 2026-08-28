@@ -43,6 +43,7 @@ type App struct {
 	blinkTick  int
 	keyHeldFor map[ebiten.Key]int
 	lastErr    string
+	scrollLine int
 }
 
 // New creates an App around ed.
@@ -109,9 +110,21 @@ func (a *App) handleRepeatable(key ebiten.Key, action func()) {
 func (a *App) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{R: 0x1e, G: 0x1e, B: 0x1e, A: 0xff})
 
+	_, screenH := screen.Bounds().Dx(), screen.Bounds().Dy()
+	visibleLines := (screenH - statusBarPx - marginY) / lineHeight
+	if visibleLines < 1 {
+		visibleLines = 1
+	}
+
 	buf := a.Ed.Buf
-	for i := 0; i < buf.LineCount(); i++ {
-		y := marginY + i*lineHeight
+	a.scrollLine = clampScroll(a.scrollLine, a.Ed.Cursor.Line, visibleLines, buf.LineCount())
+
+	lastVisible := a.scrollLine + visibleLines
+	if lastVisible > buf.LineCount() {
+		lastVisible = buf.LineCount()
+	}
+	for i := a.scrollLine; i < lastVisible; i++ {
+		y := marginY + (i-a.scrollLine)*lineHeight
 		op := &text.DrawOptions{}
 		op.GeoM.Translate(marginX, float64(y))
 		op.ColorScale.ScaleWithColor(color.White)
@@ -120,11 +133,30 @@ func (a *App) Draw(screen *ebiten.Image) {
 
 	if a.blinkTick%60 < 30 {
 		cx := float32(marginX + a.Ed.Cursor.Col*charWidth)
-		cy := float32(marginY + a.Ed.Cursor.Line*lineHeight)
+		cy := float32(marginY + (a.Ed.Cursor.Line-a.scrollLine)*lineHeight)
 		vector.StrokeLine(screen, cx, cy, cx, cy+lineHeight-2, 1, color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}, false)
 	}
 
 	a.drawStatusBar(screen)
+}
+
+// clampScroll returns the topmost visible line so that cursorLine stays
+// within the viewport of visibleLines rows, scrolling by the minimum
+// amount needed rather than always re-centering.
+func clampScroll(scroll, cursorLine, visibleLines, lineCount int) int {
+	if cursorLine < scroll {
+		scroll = cursorLine
+	}
+	if cursorLine >= scroll+visibleLines {
+		scroll = cursorLine - visibleLines + 1
+	}
+	if maxScroll := lineCount - visibleLines; scroll > maxScroll {
+		scroll = maxScroll
+	}
+	if scroll < 0 {
+		scroll = 0
+	}
+	return scroll
 }
 
 func (a *App) drawStatusBar(screen *ebiten.Image) {
