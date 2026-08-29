@@ -28,6 +28,8 @@ const (
 
 	repeatDelayTicks    = 24 // ~0.4s at 60 TPS before a held key starts repeating
 	repeatIntervalTicks = 3  // ~20 repeats/sec while held
+
+	wheelScrollLines = 3 // lines scrolled per full wheel notch
 )
 
 var face = text.NewGoXFace(basicfont.Face7x13)
@@ -40,10 +42,11 @@ var face = text.NewGoXFace(basicfont.Face7x13)
 type App struct {
 	Ed *editor.Editor
 
-	blinkTick  int
-	keyHeldFor map[ebiten.Key]int
-	lastErr    string
-	scrollLine int
+	blinkTick      int
+	keyHeldFor     map[ebiten.Key]int
+	lastErr        string
+	scrollLine     int
+	prevCursorLine int
 }
 
 // New creates an App around ed.
@@ -74,7 +77,36 @@ func (a *App) Update() error {
 		a.save()
 	}
 
+	a.updateScroll()
+
 	return nil
+}
+
+// updateScroll keeps the cursor in view whenever it has moved since the
+// last tick, and applies mouse wheel input to scroll the view on its own.
+// Wheel scrolling is deliberately not re-clamped to the cursor position
+// every tick, so the user can scroll to look around without the view
+// snapping back until the cursor itself moves.
+func (a *App) updateScroll() {
+	_, winH := ebiten.WindowSize()
+	visibleLines := visibleLineCount(winH)
+	lineCount := a.Ed.Buf.LineCount()
+
+	if a.Ed.Cursor.Line != a.prevCursorLine {
+		a.scrollLine = clampScroll(a.scrollLine, a.Ed.Cursor.Line, visibleLines, lineCount)
+		a.prevCursorLine = a.Ed.Cursor.Line
+	}
+
+	if _, wheelY := ebiten.Wheel(); wheelY != 0 {
+		a.scrollLine -= int(wheelY * wheelScrollLines)
+	}
+
+	if maxScroll := lineCount - visibleLines; a.scrollLine > maxScroll {
+		a.scrollLine = maxScroll
+	}
+	if a.scrollLine < 0 {
+		a.scrollLine = 0
+	}
 }
 
 func (a *App) save() {
@@ -111,14 +143,9 @@ func (a *App) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{R: 0x1e, G: 0x1e, B: 0x1e, A: 0xff})
 
 	_, screenH := screen.Bounds().Dx(), screen.Bounds().Dy()
-	visibleLines := (screenH - statusBarPx - marginY) / lineHeight
-	if visibleLines < 1 {
-		visibleLines = 1
-	}
+	visibleLines := visibleLineCount(screenH)
 
 	buf := a.Ed.Buf
-	a.scrollLine = clampScroll(a.scrollLine, a.Ed.Cursor.Line, visibleLines, buf.LineCount())
-
 	lastVisible := a.scrollLine + visibleLines
 	if lastVisible > buf.LineCount() {
 		lastVisible = buf.LineCount()
@@ -138,6 +165,16 @@ func (a *App) Draw(screen *ebiten.Image) {
 	}
 
 	a.drawStatusBar(screen)
+}
+
+// visibleLineCount returns how many text lines fit in a window of the
+// given height, always at least 1.
+func visibleLineCount(height int) int {
+	lines := (height - statusBarPx - marginY) / lineHeight
+	if lines < 1 {
+		lines = 1
+	}
+	return lines
 }
 
 // clampScroll returns the topmost visible line so that cursorLine stays
