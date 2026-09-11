@@ -36,7 +36,10 @@ const (
 	gutterPaddingX = 4 // horizontal padding on each side of the line numbers
 )
 
-var gutterColor = color.RGBA{R: 0x70, G: 0x70, B: 0x70, A: 0xff}
+var (
+	gutterColor    = color.RGBA{R: 0x70, G: 0x70, B: 0x70, A: 0xff}
+	selectionColor = color.RGBA{R: 0x26, G: 0x4f, B: 0x78, A: 0xff}
+)
 
 var face = text.NewGoXFace(basicfont.Face7x13)
 
@@ -178,6 +181,12 @@ func (a *App) Draw(screen *ebiten.Image) {
 	}
 	for i := a.scrollLine; i < lastVisible; i++ {
 		y := marginY + (i-a.scrollLine)*lineHeight
+
+		if colStart, colEnd, ok := a.Ed.SelectionOnLine(i); ok {
+			hx := float32(textX + colStart*charWidth)
+			hw := float32((colEnd - colStart) * charWidth)
+			vector.FillRect(screen, hx, float32(y), hw, float32(lineHeight), selectionColor, false)
+		}
 
 		lineNum := strconv.Itoa(i + 1)
 		numX := marginX + gutterW - gutterPaddingX - len(lineNum)*charWidth

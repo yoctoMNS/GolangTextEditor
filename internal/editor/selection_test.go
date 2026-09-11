@@ -105,6 +105,84 @@ func TestSelectionRangeNormalizesDirection(t *testing.T) {
 	}
 }
 
+func TestSelectionOnLine(t *testing.T) {
+	// Selection spans "lo\nworld\nhe" across three lines of "hello\nworld\nhey".
+	anchor := buffer.Position{Line: 0, Col: 3}
+	cursor := buffer.Position{Line: 2, Col: 2}
+
+	tests := []struct {
+		name         string
+		line         int
+		wantColStart int
+		wantColEnd   int
+		wantOK       bool
+	}{
+		{
+			name:   "line before selection",
+			line:   -1, // not a real line, but out of range either way
+			wantOK: false,
+		},
+		{
+			name:         "start line: from anchor column to end of line",
+			line:         0,
+			wantColStart: 3,
+			wantColEnd:   5, // len("hello")
+			wantOK:       true,
+		},
+		{
+			name:         "middle line: fully selected",
+			line:         1,
+			wantColStart: 0,
+			wantColEnd:   5, // len("world")
+			wantOK:       true,
+		},
+		{
+			name:         "end line: from start of line to cursor column",
+			line:         2,
+			wantColStart: 0,
+			wantColEnd:   2,
+			wantOK:       true,
+		},
+		{
+			name:   "line after selection",
+			line:   3,
+			wantOK: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := New()
+			e.Buf = buffer.New("hello\nworld\nhey")
+			a := anchor
+			e.Anchor = &a
+			e.Cursor = cursor
+
+			colStart, colEnd, ok := e.SelectionOnLine(tt.line)
+			if ok != tt.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if !ok {
+				return
+			}
+			if colStart != tt.wantColStart {
+				t.Errorf("colStart = %d, want %d", colStart, tt.wantColStart)
+			}
+			if colEnd != tt.wantColEnd {
+				t.Errorf("colEnd = %d, want %d", colEnd, tt.wantColEnd)
+			}
+		})
+	}
+}
+
+func TestSelectionOnLineNoSelection(t *testing.T) {
+	e := New()
+	e.Buf = buffer.New("hello")
+	if _, _, ok := e.SelectionOnLine(0); ok {
+		t.Error("expected ok to be false when there is no active selection")
+	}
+}
+
 func TestSelectedText(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -49,6 +49,28 @@ func (e *Editor) SelectedText() string {
 	return e.Buf.TextRange(start, end)
 }
 
+// SelectionOnLine returns the column range of the current selection that
+// falls on the given line, if any. It lets a renderer draw a multi-line
+// selection one line at a time without re-deriving line-boundary logic
+// itself: colStart/colEnd are clamped to the line's own bounds (the full
+// line, [0, LineLen(line)), for any line strictly between the selection's
+// start and end lines).
+func (e *Editor) SelectionOnLine(line int) (colStart, colEnd int, ok bool) {
+	start, end, has := e.SelectionRange()
+	if !has || line < start.Line || line > end.Line {
+		return 0, 0, false
+	}
+	colStart = 0
+	if line == start.Line {
+		colStart = start.Col
+	}
+	colEnd = e.Buf.LineLen(line)
+	if line == end.Line {
+		colEnd = end.Col
+	}
+	return colStart, colEnd, true
+}
+
 func positionLess(a, b buffer.Position) bool {
 	if a.Line != b.Line {
 		return a.Line < b.Line
