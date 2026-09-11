@@ -89,6 +89,8 @@ func (a *App) Update() error {
 
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		a.handleClick()
+	} else if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+		a.handleDrag()
 	}
 
 	a.updateScroll()
@@ -97,16 +99,33 @@ func (a *App) Update() error {
 }
 
 // handleClick moves the caret to wherever the left mouse button was just
-// clicked and cancels any active selection, matching a plain click in
-// other editors (Shift+click or drag-to-select are not handled here).
+// pressed, cancels any previously active selection, and anchors a new
+// (as yet empty) selection there. Anchoring here rather than only in
+// handleDrag means a plain click without any drag leaves no selection
+// (StartSelection sets the anchor equal to the cursor, and HasSelection
+// treats an anchor equal to the cursor as no selection), while a
+// click-and-drag extends it (see handleDrag).
 func (a *App) handleClick() {
+	a.Ed.Cursor = a.cursorAtMouse()
+	a.Ed.ClearSelection()
+	a.Ed.StartSelection()
+}
+
+// handleDrag moves the caret to the current mouse position while the left
+// button is held, extending the selection anchored by handleClick.
+func (a *App) handleDrag() {
+	a.Ed.Cursor = a.cursorAtMouse()
+}
+
+// cursorAtMouse converts the current mouse position to a valid caret
+// position in the buffer.
+func (a *App) cursorAtMouse() buffer.Position {
 	x, y := ebiten.CursorPosition()
 	gutterW := viewport.GutterWidth(a.Ed.Buf.LineCount(), charWidth, gutterPaddingX)
 	textX := marginX + gutterW
 
 	line, col := viewport.PositionAt(x, y, textX, marginY, a.scrollLine, charWidth, lineHeight)
-	a.Ed.Cursor = a.Ed.Buf.Clamp(buffer.Position{Line: line, Col: col})
-	a.Ed.ClearSelection()
+	return a.Ed.Buf.Clamp(buffer.Position{Line: line, Col: col})
 }
 
 // updateScroll keeps the cursor in view whenever it has moved since the
