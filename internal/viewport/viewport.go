@@ -36,6 +36,33 @@ func ClampScroll(scroll, cursorLine, visibleLines, lineCount int) int {
 	return scroll
 }
 
+// PositionAt returns the (line, col) a click at pixel (x, y) targets,
+// given the pixel origin of the text area (originX, originY, i.e. after
+// margins and the line-number gutter), the topmost visible buffer line
+// (scrollLine), and the pixel size of one character cell (charWidth,
+// lineHeight). The result is not clamped to the buffer's actual bounds
+// (a click can target a line/column past the end of a short file or
+// line); callers should clamp it, e.g. via buffer.Buffer.Clamp, before
+// using it as a caret position.
+func PositionAt(x, y, originX, originY, scrollLine, charWidth, lineHeight int) (line, col int) {
+	line = scrollLine + floorDiv(y-originY, lineHeight)
+	col = floorDiv(x-originX, charWidth)
+	return line, col
+}
+
+// floorDiv divides a by b rounding toward negative infinity, unlike Go's
+// built-in / which rounds toward zero. This matters for PositionAt because
+// a click above or left of the text origin (a negative numerator) should
+// map to an earlier line/column, not clamp toward 0 the way truncating
+// division would.
+func floorDiv(a, b int) int {
+	q := a / b
+	if a%b != 0 && (a < 0) != (b < 0) {
+		q--
+	}
+	return q
+}
+
 // GutterWidth returns the pixel width of a line-number gutter wide enough
 // to fit lineCount (at least 2 digits, so short files don't get an oddly
 // narrow gutter), given the width of one character and the horizontal

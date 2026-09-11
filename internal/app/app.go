@@ -17,6 +17,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"golang.org/x/image/font/basicfont"
 
+	"github.com/yoctoMNS/GolangTextEditor/internal/buffer"
 	"github.com/yoctoMNS/GolangTextEditor/internal/editor"
 	"github.com/yoctoMNS/GolangTextEditor/internal/viewport"
 )
@@ -86,9 +87,26 @@ func (a *App) Update() error {
 		a.save()
 	}
 
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		a.handleClick()
+	}
+
 	a.updateScroll()
 
 	return nil
+}
+
+// handleClick moves the caret to wherever the left mouse button was just
+// clicked and cancels any active selection, matching a plain click in
+// other editors (Shift+click or drag-to-select are not handled here).
+func (a *App) handleClick() {
+	x, y := ebiten.CursorPosition()
+	gutterW := viewport.GutterWidth(a.Ed.Buf.LineCount(), charWidth, gutterPaddingX)
+	textX := marginX + gutterW
+
+	line, col := viewport.PositionAt(x, y, textX, marginY, a.scrollLine, charWidth, lineHeight)
+	a.Ed.Cursor = a.Ed.Buf.Clamp(buffer.Position{Line: line, Col: col})
+	a.Ed.ClearSelection()
 }
 
 // updateScroll keeps the cursor in view whenever it has moved since the

@@ -44,6 +44,63 @@ func TestLineCount(t *testing.T) {
 	}
 }
 
+func TestPositionAt(t *testing.T) {
+	// originX=40, originY=4, scrollLine=0, charWidth=7, lineHeight=16
+	// for every case unless noted otherwise.
+	tests := []struct {
+		name       string
+		x, y       int
+		scrollLine int
+		wantLine   int
+		wantCol    int
+	}{
+		{
+			name: "click exactly at the text origin targets line 0, col 0",
+			x:    40, y: 4,
+			wantLine: 0, wantCol: 0,
+		},
+		{
+			name: "click one full cell right and down targets line 1, col 1",
+			x:    47, y: 20,
+			wantLine: 1, wantCol: 1,
+		},
+		{
+			name: "click mid-cell rounds down to that cell, not the next one",
+			x:    44, y: 10, // 4px into col 0's 7px cell; 6px into row 0's 16px cell
+			wantLine: 0, wantCol: 0,
+		},
+		{
+			name: "click left of the text origin (e.g. in the gutter) gives a negative column",
+			x:    10, y: 4,
+			wantLine: 0, wantCol: -5, // (10-40)/7 floors to -5, not -4
+		},
+		{
+			name: "click above the text origin gives a negative line",
+			x:    40, y: -10,
+			wantLine: -1, wantCol: 0, // (-10-4)/16 floors to -1, not 0
+		},
+		{
+			name: "scrollLine offsets the resulting line",
+			x:    40, y: 20,
+			scrollLine: 5,
+			wantLine:   6, // scrolled 5 + 1 row down from the click
+			wantCol:    0,
+		},
+	}
+
+	const originX, originY, charWidth, lineHeight = 40, 4, 7, 16
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotLine, gotCol := PositionAt(tt.x, tt.y, originX, originY, tt.scrollLine, charWidth, lineHeight)
+			if gotLine != tt.wantLine || gotCol != tt.wantCol {
+				t.Errorf("PositionAt(%d, %d, scrollLine=%d) = (%d, %d), want (%d, %d)",
+					tt.x, tt.y, tt.scrollLine, gotLine, gotCol, tt.wantLine, tt.wantCol)
+			}
+		})
+	}
+}
+
 func TestGutterWidth(t *testing.T) {
 	tests := []struct {
 		name      string
