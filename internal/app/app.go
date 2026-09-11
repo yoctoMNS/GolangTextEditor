@@ -71,10 +71,10 @@ func (a *App) Update() error {
 	a.handleRepeatable(ebiten.KeyEnter, a.Ed.InsertNewline)
 	a.handleRepeatable(ebiten.KeyBackspace, a.Ed.Backspace)
 	a.handleRepeatable(ebiten.KeyDelete, a.Ed.Delete)
-	a.handleRepeatable(ebiten.KeyArrowLeft, a.Ed.MoveLeft)
-	a.handleRepeatable(ebiten.KeyArrowRight, a.Ed.MoveRight)
-	a.handleRepeatable(ebiten.KeyArrowUp, a.Ed.MoveUp)
-	a.handleRepeatable(ebiten.KeyArrowDown, a.Ed.MoveDown)
+	a.handleMoveKey(ebiten.KeyArrowLeft, a.Ed.MoveLeft)
+	a.handleMoveKey(ebiten.KeyArrowRight, a.Ed.MoveRight)
+	a.handleMoveKey(ebiten.KeyArrowUp, a.Ed.MoveUp)
+	a.handleMoveKey(ebiten.KeyArrowDown, a.Ed.MoveDown)
 	a.handleRepeatable(ebiten.KeyHome, a.Ed.Home)
 	a.handleRepeatable(ebiten.KeyEnd, a.Ed.End)
 
@@ -125,6 +125,23 @@ func (a *App) save() {
 		return
 	}
 	a.lastErr = ""
+}
+
+// handleMoveKey wraps a cursor-movement action so that holding Shift
+// extends the current selection (starting one at the caret if none is
+// active yet) instead of moving the caret alone, matching the
+// Shift+Arrow convention of other editors. Moving without Shift cancels
+// any active selection.
+func (a *App) handleMoveKey(key ebiten.Key, move func()) {
+	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
+	a.handleRepeatable(key, func() {
+		if shift {
+			a.Ed.StartSelection()
+		} else {
+			a.Ed.ClearSelection()
+		}
+		move()
+	})
 }
 
 // handleRepeatable calls action on the tick a key is first pressed, and
