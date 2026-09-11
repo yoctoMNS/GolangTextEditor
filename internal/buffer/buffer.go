@@ -62,6 +62,26 @@ func (b *Buffer) String() string {
 	return sb.String()
 }
 
+// TextRange returns the text between start and end (end exclusive), which
+// must satisfy start <= end in document order (same line: start.Col <=
+// end.Col; otherwise start.Line < end.Line). Lines in between are joined
+// with "\n", matching String()'s line separator.
+func (b *Buffer) TextRange(start, end Position) string {
+	if start.Line == end.Line {
+		return string(b.lines[start.Line][start.Col:end.Col])
+	}
+
+	var sb strings.Builder
+	sb.WriteString(string(b.lines[start.Line][start.Col:]))
+	for l := start.Line + 1; l < end.Line; l++ {
+		sb.WriteByte('\n')
+		sb.WriteString(string(b.lines[l]))
+	}
+	sb.WriteByte('\n')
+	sb.WriteString(string(b.lines[end.Line][:end.Col]))
+	return sb.String()
+}
+
 // Clamp constrains pos so it always refers to a valid location in the
 // buffer, clamping the line into range first and then the column.
 func (b *Buffer) Clamp(pos Position) Position {

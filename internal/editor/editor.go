@@ -16,6 +16,11 @@ type Editor struct {
 	Cursor   buffer.Position
 	Path     string
 	Modified bool
+
+	// Anchor is the fixed end of the current text selection; nil means no
+	// selection is active. The other end is always the current Cursor.
+	// See selection.go for the selection API.
+	Anchor *buffer.Position
 }
 
 // New creates an empty Editor with a single empty line.
