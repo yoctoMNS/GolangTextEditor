@@ -44,6 +44,55 @@ func TestLineCount(t *testing.T) {
 	}
 }
 
+func TestGutterWidth(t *testing.T) {
+	tests := []struct {
+		name      string
+		lineCount int
+		charWidth int
+		paddingX  int
+		want      int
+	}{
+		{
+			name:      "short file still gets a 2-digit-wide gutter",
+			lineCount: 5,
+			charWidth: 7,
+			paddingX:  4,
+			want:      2*7 + 4*2, // = 22
+		},
+		{
+			name:      "3-digit file gets a wider gutter",
+			lineCount: 100,
+			charWidth: 7,
+			paddingX:  4,
+			want:      3*7 + 4*2, // = 29
+		},
+		{
+			name:      "digit count follows the largest line number, not just magnitude",
+			lineCount: 999,
+			charWidth: 7,
+			paddingX:  4,
+			want:      3*7 + 4*2, // = 29
+		},
+		{
+			name:      "4-digit file",
+			lineCount: 1000,
+			charWidth: 7,
+			paddingX:  4,
+			want:      4*7 + 4*2, // = 36
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GutterWidth(tt.lineCount, tt.charWidth, tt.paddingX)
+			if got != tt.want {
+				t.Errorf("GutterWidth(%d, %d, %d) = %d, want %d",
+					tt.lineCount, tt.charWidth, tt.paddingX, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestClampScroll(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -5,6 +5,8 @@
 // internal/app itself (see CLAUDE.md and internal/app/app.go).
 package viewport
 
+import "strconv"
+
 // LineCount returns how many text lines of lineHeight fit within
 // availableHeight, always at least 1.
 func LineCount(availableHeight, lineHeight int) int {
@@ -32,4 +34,16 @@ func ClampScroll(scroll, cursorLine, visibleLines, lineCount int) int {
 		scroll = 0
 	}
 	return scroll
+}
+
+// GutterWidth returns the pixel width of a line-number gutter wide enough
+// to fit lineCount (at least 2 digits, so short files don't get an oddly
+// narrow gutter), given the width of one character and the horizontal
+// padding to leave on each side of the digits.
+func GutterWidth(lineCount, charWidth, paddingX int) int {
+	digits := len(strconv.Itoa(lineCount))
+	if digits < 2 {
+		digits = 2
+	}
+	return digits*charWidth + paddingX*2
 }

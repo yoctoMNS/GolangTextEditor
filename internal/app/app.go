@@ -9,6 +9,7 @@ package app
 import (
 	"fmt"
 	"image/color"
+	"strconv"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -31,7 +32,11 @@ const (
 	repeatIntervalTicks = 3  // ~20 repeats/sec while held
 
 	wheelScrollLines = 3 // lines scrolled per full wheel notch
+
+	gutterPaddingX = 4 // horizontal padding on each side of the line numbers
 )
+
+var gutterColor = color.RGBA{R: 0x70, G: 0x70, B: 0x70, A: 0xff}
 
 var face = text.NewGoXFace(basicfont.Face7x13)
 
@@ -147,20 +152,31 @@ func (a *App) Draw(screen *ebiten.Image) {
 	visibleLines := visibleLineCount(screenH)
 
 	buf := a.Ed.Buf
+	gutterW := viewport.GutterWidth(buf.LineCount(), charWidth, gutterPaddingX)
+	textX := marginX + gutterW
+
 	lastVisible := a.scrollLine + visibleLines
 	if lastVisible > buf.LineCount() {
 		lastVisible = buf.LineCount()
 	}
 	for i := a.scrollLine; i < lastVisible; i++ {
 		y := marginY + (i-a.scrollLine)*lineHeight
+
+		lineNum := strconv.Itoa(i + 1)
+		numX := marginX + gutterW - gutterPaddingX - len(lineNum)*charWidth
+		numOp := &text.DrawOptions{}
+		numOp.GeoM.Translate(float64(numX), float64(y))
+		numOp.ColorScale.ScaleWithColor(gutterColor)
+		text.Draw(screen, lineNum, face, numOp)
+
 		op := &text.DrawOptions{}
-		op.GeoM.Translate(marginX, float64(y))
+		op.GeoM.Translate(float64(textX), float64(y))
 		op.ColorScale.ScaleWithColor(color.White)
 		text.Draw(screen, buf.Line(i), face, op)
 	}
 
 	if a.blinkTick%60 < 30 {
-		cx := float32(marginX + a.Ed.Cursor.Col*charWidth)
+		cx := float32(textX + a.Ed.Cursor.Col*charWidth)
 		cy := float32(marginY + (a.Ed.Cursor.Line-a.scrollLine)*lineHeight)
 		vector.StrokeLine(screen, cx, cy, cx, cy+lineHeight-2, 1, color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}, false)
 	}
