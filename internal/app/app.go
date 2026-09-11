@@ -17,6 +17,7 @@ import (
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/yoctoMNS/GolangTextEditor/internal/editor"
+	"github.com/yoctoMNS/GolangTextEditor/internal/viewport"
 )
 
 const (
@@ -93,7 +94,7 @@ func (a *App) updateScroll() {
 	lineCount := a.Ed.Buf.LineCount()
 
 	if a.Ed.Cursor.Line != a.prevCursorLine {
-		a.scrollLine = clampScroll(a.scrollLine, a.Ed.Cursor.Line, visibleLines, lineCount)
+		a.scrollLine = viewport.ClampScroll(a.scrollLine, a.Ed.Cursor.Line, visibleLines, lineCount)
 		a.prevCursorLine = a.Ed.Cursor.Line
 	}
 
@@ -170,30 +171,7 @@ func (a *App) Draw(screen *ebiten.Image) {
 // visibleLineCount returns how many text lines fit in a window of the
 // given height, always at least 1.
 func visibleLineCount(height int) int {
-	lines := (height - statusBarPx - marginY) / lineHeight
-	if lines < 1 {
-		lines = 1
-	}
-	return lines
-}
-
-// clampScroll returns the topmost visible line so that cursorLine stays
-// within the viewport of visibleLines rows, scrolling by the minimum
-// amount needed rather than always re-centering.
-func clampScroll(scroll, cursorLine, visibleLines, lineCount int) int {
-	if cursorLine < scroll {
-		scroll = cursorLine
-	}
-	if cursorLine >= scroll+visibleLines {
-		scroll = cursorLine - visibleLines + 1
-	}
-	if maxScroll := lineCount - visibleLines; scroll > maxScroll {
-		scroll = maxScroll
-	}
-	if scroll < 0 {
-		scroll = 0
-	}
-	return scroll
+	return viewport.LineCount(height-statusBarPx-marginY, lineHeight)
 }
 
 func (a *App) drawStatusBar(screen *ebiten.Image) {
