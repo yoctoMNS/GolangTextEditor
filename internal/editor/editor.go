@@ -60,28 +60,42 @@ func (e *Editor) SaveAs(path string) error {
 	return nil
 }
 
-// InsertRune inserts r at the caret and advances the caret past it.
+// InsertRune inserts r at the caret and advances the caret past it. If a
+// selection is active, it replaces the selection instead of just inserting.
 func (e *Editor) InsertRune(r rune) {
+	e.deleteSelectionIfAny()
 	e.Cursor = e.Buf.InsertRune(e.Cursor, r)
 	e.Modified = true
 }
 
-// InsertNewline splits the current line at the caret.
+// InsertNewline splits the current line at the caret. If a selection is
+// active, it replaces the selection instead of just splitting.
 func (e *Editor) InsertNewline() {
+	e.deleteSelectionIfAny()
 	e.Cursor = e.Buf.InsertNewline(e.Cursor)
 	e.Modified = true
 }
 
 // Backspace deletes the rune before the caret, joining lines if needed.
+// If a selection is active, it deletes the selection instead, and does
+// not additionally delete the rune before it.
 func (e *Editor) Backspace() {
+	if e.deleteSelectionIfAny() {
+		return
+	}
 	if pos, ok := e.Buf.DeleteBackward(e.Cursor); ok {
 		e.Cursor = pos
 		e.Modified = true
 	}
 }
 
-// Delete deletes the rune at the caret, joining lines if needed.
+// Delete deletes the rune at the caret, joining lines if needed. If a
+// selection is active, it deletes the selection instead, and does not
+// additionally delete the rune at the caret.
 func (e *Editor) Delete() {
+	if e.deleteSelectionIfAny() {
+		return
+	}
 	if e.Buf.DeleteForward(e.Cursor) {
 		e.Modified = true
 	}

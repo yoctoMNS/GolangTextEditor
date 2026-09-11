@@ -49,6 +49,23 @@ func (e *Editor) SelectedText() string {
 	return e.Buf.TextRange(start, end)
 }
 
+// deleteSelectionIfAny removes the currently selected text, if any,
+// moving the caret to where the selection started and clearing it. It
+// reports whether a selection was deleted, so callers (InsertRune,
+// InsertNewline, Backspace, Delete) can tell whether they still need to
+// perform their own single-character edit afterwards.
+func (e *Editor) deleteSelectionIfAny() bool {
+	start, end, ok := e.SelectionRange()
+	if !ok {
+		return false
+	}
+	e.Buf.DeleteRange(start, end)
+	e.Cursor = start
+	e.ClearSelection()
+	e.Modified = true
+	return true
+}
+
 // SelectionOnLine returns the column range of the current selection that
 // falls on the given line, if any. It lets a renderer draw a multi-line
 // selection one line at a time without re-deriving line-boundary logic

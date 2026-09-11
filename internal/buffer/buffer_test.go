@@ -296,6 +296,62 @@ func TestTextRange(t *testing.T) {
 	}
 }
 
+func TestDeleteRange(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		start   Position
+		end     Position
+		want    string
+	}{
+		{
+			name:    "within a single line",
+			content: "hello world",
+			start:   Position{Line: 0, Col: 5},
+			end:     Position{Line: 0, Col: 11},
+			want:    "hello",
+		},
+		{
+			name:    "empty range is a no-op",
+			content: "hello",
+			start:   Position{Line: 0, Col: 2},
+			end:     Position{Line: 0, Col: 2},
+			want:    "hello",
+		},
+		{
+			name:    "spans two adjacent lines",
+			content: "hello\nworld",
+			start:   Position{Line: 0, Col: 3},
+			end:     Position{Line: 1, Col: 3},
+			want:    "helld",
+		},
+		{
+			name:    "spans three lines, removing a full middle line",
+			content: "one\ntwo\nthree",
+			start:   Position{Line: 0, Col: 1},
+			end:     Position{Line: 2, Col: 2},
+			want:    "oree",
+		},
+		{
+			name:    "deleting the whole buffer leaves one empty line",
+			content: "a\nbb\nccc",
+			start:   Position{Line: 0, Col: 0},
+			end:     Position{Line: 2, Col: 3},
+			want:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(tt.content)
+			b.DeleteRange(tt.start, tt.end)
+			if got := b.String(); got != tt.want {
+				t.Errorf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestClamp(t *testing.T) {
 	b := New("hi\nworld")
 

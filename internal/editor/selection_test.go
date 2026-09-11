@@ -183,6 +183,93 @@ func TestSelectionOnLineNoSelection(t *testing.T) {
 	}
 }
 
+func TestInsertRuneReplacesSelection(t *testing.T) {
+	e := New()
+	e.Buf = buffer.New("hello world")
+	e.Cursor = buffer.Position{Line: 0, Col: 0}
+	e.StartSelection()
+	e.Cursor = buffer.Position{Line: 0, Col: 5} // selects "hello"
+
+	e.InsertRune('X')
+
+	if got, want := e.Buf.String(), "X world"; got != want {
+		t.Fatalf("Buf.String() = %q, want %q", got, want)
+	}
+	if want := (buffer.Position{Line: 0, Col: 1}); e.Cursor != want {
+		t.Fatalf("Cursor = %+v, want %+v", e.Cursor, want)
+	}
+	if e.HasSelection() {
+		t.Error("expected selection to be cleared")
+	}
+	if !e.Modified {
+		t.Error("expected Modified to be true")
+	}
+}
+
+func TestInsertNewlineReplacesSelection(t *testing.T) {
+	e := New()
+	e.Buf = buffer.New("hello world")
+	e.Cursor = buffer.Position{Line: 0, Col: 0}
+	e.StartSelection()
+	e.Cursor = buffer.Position{Line: 0, Col: 5} // selects "hello"
+
+	e.InsertNewline()
+
+	if got, want := e.Buf.String(), "\n world"; got != want {
+		t.Fatalf("Buf.String() = %q, want %q", got, want)
+	}
+	if want := (buffer.Position{Line: 1, Col: 0}); e.Cursor != want {
+		t.Fatalf("Cursor = %+v, want %+v", e.Cursor, want)
+	}
+	if e.HasSelection() {
+		t.Error("expected selection to be cleared")
+	}
+}
+
+func TestBackspaceDeletesSelectionOnly(t *testing.T) {
+	e := New()
+	e.Buf = buffer.New("hello world")
+	e.Cursor = buffer.Position{Line: 0, Col: 6}
+	e.StartSelection()
+	e.Cursor = buffer.Position{Line: 0, Col: 11} // selects "world"
+
+	e.Backspace()
+
+	// If Backspace additionally deleted the rune before the selection,
+	// this would be "hello" instead of "hello ".
+	if got, want := e.Buf.String(), "hello "; got != want {
+		t.Fatalf("Buf.String() = %q, want %q", got, want)
+	}
+	if want := (buffer.Position{Line: 0, Col: 6}); e.Cursor != want {
+		t.Fatalf("Cursor = %+v, want %+v", e.Cursor, want)
+	}
+	if e.HasSelection() {
+		t.Error("expected selection to be cleared")
+	}
+}
+
+func TestDeleteDeletesSelectionOnly(t *testing.T) {
+	e := New()
+	e.Buf = buffer.New("hello world")
+	e.Cursor = buffer.Position{Line: 0, Col: 0}
+	e.StartSelection()
+	e.Cursor = buffer.Position{Line: 0, Col: 5} // selects "hello"
+
+	e.Delete()
+
+	// If Delete additionally deleted the rune after the selection, this
+	// would be "world" instead of " world".
+	if got, want := e.Buf.String(), " world"; got != want {
+		t.Fatalf("Buf.String() = %q, want %q", got, want)
+	}
+	if want := (buffer.Position{Line: 0, Col: 0}); e.Cursor != want {
+		t.Fatalf("Cursor = %+v, want %+v", e.Cursor, want)
+	}
+	if e.HasSelection() {
+		t.Error("expected selection to be cleared")
+	}
+}
+
 func TestSelectedText(t *testing.T) {
 	tests := []struct {
 		name      string

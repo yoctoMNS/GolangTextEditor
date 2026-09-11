@@ -82,6 +82,24 @@ func (b *Buffer) TextRange(start, end Position) string {
 	return sb.String()
 }
 
+// DeleteRange removes the text between start and end (end exclusive),
+// which must satisfy start <= end in document order (same constraint as
+// TextRange), joining the surrounding lines into one when the range spans
+// more than one line.
+func (b *Buffer) DeleteRange(start, end Position) {
+	if start.Line == end.Line {
+		line := b.lines[start.Line]
+		copy(line[start.Col:], line[end.Col:])
+		b.lines[start.Line] = line[:len(line)-(end.Col-start.Col)]
+		return
+	}
+
+	head := b.lines[start.Line][:start.Col]
+	tail := b.lines[end.Line][end.Col:]
+	b.lines[start.Line] = append(head, tail...)
+	b.lines = append(b.lines[:start.Line+1], b.lines[end.Line+1:]...)
+}
+
 // Clamp constrains pos so it always refers to a valid location in the
 // buffer, clamping the line into range first and then the column.
 func (b *Buffer) Clamp(pos Position) Position {
